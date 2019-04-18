@@ -14,9 +14,9 @@ ap.add_argument("-w", "--write", help = "Write the output image")
 ap.add_argument("-s", "--show", default = False, action='store_true', help = "Show the output image")
 
 ap.add_argument("-n", "--colors", default = 5, type = int, help = "Number of Skittle colors")
-ap.add_argument("--min", default = 24, type = int, help = "Minimum Skittle radius in pixels")
-ap.add_argument("--max", default = 36, type = int, help = "Maximum Skittle radius in pixels")
-ap.add_argument("--distance", default = 36, type = int, help = "Minimum Skittle distance between centers in pixels")
+ap.add_argument("--min", default = 30, type = int, help = "Minimum Skittle radius in pixels")
+ap.add_argument("--max", default = 34, type = int, help = "Maximum Skittle radius in pixels")
+ap.add_argument("--distance", default = 38, type = int, help = "Minimum Skittle distance between centers in pixels")
 # advanced HoughCircles parameters:
 ap.add_argument("--dp", default = 2, type = int, help = "Inverse ratio of the accumulator resolution to the image resolution. For example, if dp=1 , the accumulator has the same resolution as the input image. If dp=2 , the accumulator has half as big width and height.")
 ap.add_argument("--p1", default = 50, type = int, help = "First method-specific parameter. In case of CV_HOUGH_GRADIENT , it is the higher threshold of the two passed to the Canny() edge detector (the lower one is twice smaller).")
