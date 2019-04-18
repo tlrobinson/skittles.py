@@ -11,6 +11,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-d", "--directory", help = "Path to directory")
 ap.add_argument("-w", "--write", help = "Write the output image")
 ap.add_argument("-s", "--show", default = False, action='store_true', help = "Show the output image")
+ap.add_argument("files", nargs='*')
 
 ap.add_argument("-n", "--colors", default = 5, type = int, help = "Number of Skittle colors")
 ap.add_argument("--min", default = 30, type = int, help = "Minimum Skittle radius in pixels")
