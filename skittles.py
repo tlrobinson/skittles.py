@@ -1,11 +1,17 @@
+#!/usr/bin/env python
+
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, abspath
 import argparse
 import cv2
 import numpy as np
 import colorsys
 from sklearn.cluster import KMeans
 from natsort import natsorted
+import csv
+import Levenshtein
+from heapq import heappush, heappop
+import itertools
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-d", "--directory", help = "Path to directory")
@@ -32,8 +38,26 @@ DEFAULT_CLUSTER_CENTERS = np.asarray([
     [14.77467167,  12.48393894,  17.08273171], # Grape
  ])
 
+# convert counts to a string we can get the Levenshtein distance
+flavor_characters = ["S", "O", "L", "A", "G"]
+flavor_string_order = [4, 0, 1, 2, 3] # put grape next to strawberry since they're likely to be misclassified
+def to_flavor_string(result, order=flavor_string_order):
+    return "".join([flavor_characters[i] * result[i] for i in order])
+
+results = [] # (path, cluster_counts, flavor_string)
+known_results = {}
+
+# read the manual counts
+with open('skittles/skittles.txt') as tsvfile:
+    reader = csv.reader(tsvfile, delimiter='\t')
+    next(reader) # skip header
+    for index, row in enumerate(reader):
+        counts = list(map(int, row))
+        path = join("./skittles/images", "{}.jpg".format(index + 1))
+        known_results[abspath(path)] = (path, counts, to_flavor_string(counts))
+
 def process(path):
-    # load the image, clone it for output, and then convert it to grayscale
+    # load the image and then convert it to grayscale
     image = cv2.imread(path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -77,7 +101,20 @@ def process(path):
         cluster_counts = [0] * args["colors"]
         for cluster_index in predictions:
             cluster_counts[cluster_index] += 1
-        print("\t".join([str(count) for count in cluster_counts]))
+
+        flavor_string = to_flavor_string(cluster_counts)
+
+        row = [str(count) for count in cluster_counts]
+
+        # if we have known result for this path, append the Levenshtein distance to the row
+        dist = None
+        if abspath(path) in known_results:
+            dist = Levenshtein.distance(flavor_string, known_results[abspath(path)][2])
+            row.append(str(dist))
+
+        # print("\t".join(row))
+
+        results.append((path, cluster_counts, flavor_string, dist))
 
         if args["write"] or args["show"]:
             output = image.copy()
@@ -88,7 +125,7 @@ def process(path):
 
                 color = kmeans.cluster_centers_[cluster_index]
                 cv2.circle(output, (x, y), r-1, (255,255,255), 2)
-                cv2.circle(output, (x, y), r, color, 2)
+                cv2.circle(output, (x, y), r+1, color, 3)
 
                 label_text = str(cluster_index)
                 label_size = cv2.getTextSize(label_text, FONT_FACE, 0.5, 2)[0]
@@ -102,11 +139,62 @@ def process(path):
                 cv2.imshow("output", np.hstack([image, output]))
                 cv2.waitKey(0)
 
-if args["directory"]:
-    for f in natsorted(listdir(args["directory"])):
-        path = join(args["directory"], f)
-        if isfile(path):
-            process(path)
-elif args["files"]:
+DISTANCE_THREASHOLD = 2
+# returns closest matching results
+def get_best_matches(results, threshold = DISTANCE_THREASHOLD):
+    heap = []
+    for index1, (path1, _, string1, _) in enumerate(results):
+        for index2, (path2, _, string2, _) in enumerate(results):
+            if index1 < index2:
+                # compute the Levenshtein distance and add to a heap queue
+                dist = Levenshtein.distance(string1, string2)
+                if dist <= threshold:
+                    heappush(heap, (dist, path1, path2))
+    return heap
+
+def get_known_stats(results):
+    distance_total = 0
+    distance_max = max([d for (_,_,_,d) in results])
+    distance_distribution = [0] * (distance_max + 1)
+    for (_, _, _, distance) in results:
+        distance_total += distance or 0
+        distance_distribution[distance] += 1
+    return (distance_total, distance_max, distance_distribution)
+
+# determines the best order for flavor string by comparing to known results
+def get_best_flavor_string_orders(results, known_results):
+    heap = []
+    for order in itertools.permutations(flavor_string_order):
+        distance_total = 0
+        for (path, counts, _, distance) in results:
+            if distance > 0:
+                distance_total += Levenshtein.distance(
+                    to_flavor_string(counts, order),
+                    to_flavor_string(known_results[abspath(path)][1], order)
+                )
+        heappush(heap, (distance_total, order))
+    return heap
+
+if args["files"]:
     for f in args["files"]:
         process(f)
+else:
+    directory = args["directory"] or "./skittles/images"
+    for f in natsorted(listdir(directory)):
+        path = join(directory, f)
+        if isfile(path):
+            process(path)
+
+# log differences between known and actual results
+(distance_total, distance_max, distance_distribution) = get_known_stats(results)
+print("Known distance total:", distance_total)
+print("Known distance max:", distance_max)
+print("Known distance distribution:", distance_distribution)
+
+best_matches = get_best_matches(results)
+print ("Matches:")
+while len(best_matches) > 0:
+    print(heappop(best_matches))
+
+# determine the best flavor string order for comparing with Levenshtein distance
+# print(heappop(get_best_flavor_string_orders(results, known_results)))
