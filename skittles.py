@@ -3,13 +3,12 @@ from os.path import isfile, join
 import argparse
 import cv2
 import numpy as np
+import colorsys
 from sklearn.cluster import KMeans
 from natsort import natsorted
 
 ap = argparse.ArgumentParser()
-group = ap.add_mutually_exclusive_group(required=True)
-group.add_argument("-d", "--directory", help = "Path to directory")
-group.add_argument("-i", "--image", help = "Path to the image")
+ap.add_argument("-d", "--directory", help = "Path to directory")
 ap.add_argument("-w", "--write", help = "Write the output image")
 ap.add_argument("-s", "--show", default = False, action='store_true', help = "Show the output image")
 
@@ -107,5 +106,6 @@ if args["directory"]:
         path = join(args["directory"], f)
         if isfile(path):
             process(path)
-elif args["image"]:
-    process(args["image"])
+elif args["files"]:
+    for f in args["files"]:
+        process(f)
